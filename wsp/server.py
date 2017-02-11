@@ -89,8 +89,9 @@ class SimpleWSPDispatcher:
                     pdesc['type'] = ptype.__name__
                     pdesc['order'] = i
                     mdesc['params'][name] = pdesc
+                return_type = method.get_return_info()
                 mdesc['return_info'] = {
-                    'type': method.get_return_info().__name__
+                    'type': None if not return_type else return_type.__name__
                 }
                 desc['methods'][method.name] = mdesc
         else:
@@ -145,7 +146,7 @@ class SimpleWSPRequestHandler(BaseHTTPRequestHandler):
         try:
             response = self.server.generate_description(self.path)
         except Exception:
-            # TODO: chacge it to send_error
+            # TODO: change it to send_error
             self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header('Content-length', '0')
             self.end_headers()

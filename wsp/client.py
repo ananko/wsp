@@ -27,7 +27,7 @@ class Transport:
 
         resp = connection.getresponse()
         if resp.status != HTTPStatus.OK:
-            print('WTF')
+            print('Something wrong with transport, please check server side')
             return None
         return resp.read()
 
@@ -75,9 +75,11 @@ class _Method:
         self.description = description
         self._args = {}
         self._kwargs = {}
-        self._return_type = RETURN_TYPES[
-            self.description['return_info']['type']
-        ]
+        self._return_type = None
+        if self.description['return_info']['type']:
+            self._return_type = RETURN_TYPES[
+                self.description['return_info']['type']
+            ]
         for arg_name in self.description['params']:
             arg = self.description['params'][arg_name]
             arg['name'] = arg_name
@@ -98,7 +100,9 @@ class _Method:
             req_args[key] = value
         request['args'] = req_args
         response = self.service._handle_request(request)
-        result = self._return_type(response['result'])
+        result = None
+        if self._return_type:
+            result = self._return_type(response['result'])
         return result
 
 
