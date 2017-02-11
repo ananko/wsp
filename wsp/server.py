@@ -17,7 +17,8 @@ class SimpleWSPService:
             self.signature = inspect.signature(function)
 
         def __call__(self, *args, **kwargs):
-            return self.function(args, kwargs)
+            # should I use signature.bind?
+            return self.function(*args, **kwargs)
 
         def get_return_info(self):
             return self.signature.return_annotation
@@ -37,10 +38,14 @@ class SimpleWSPService:
         method = SimpleWSPService.Method(function)
         for name, param in method.signature.parameters.items():
             if param.annotation == param.empty:
-                raise Exception("Type of parameter '%s' is not specified" % name)
+                raise Exception("Type of parameter '%s' is not specified"
+                                % name)
         if method.signature.return_annotation == method.signature.empty:
             raise Exception('Return type is not specifed')
         self.methods[method.name] = method
+        name = method.name
+        if hasattr(self, name):
+            name = '___' + name
         self.__setattr__(name, method)
 
     def get_method(self, name):
@@ -56,13 +61,14 @@ class SimpleWSPDispatcher:
 
     def register(self, service):
         if service.name in self.services:
-            raise Exception("Service '%s' is already registered" % service.name)
+            raise Exception("Service '%s' is already registered"
+                            % service.name)
         self.services[service.name] = service
 
     def generate_description(self, path):
         desc = {
             'type': 'wsp/description',
-            'version': str(WSP_VERSION),
+            'version': WSP_VERSION,
             'url': '%s' % path
         }
         service = path.split('/')[1]
@@ -71,6 +77,7 @@ class SimpleWSPDispatcher:
         elif service in self.services:
             service = self.services[service]
             desc['service'] = service.name
+            desc['description'] = service.description
             desc['types'] = {}
             desc['methods'] = {}
             for method in service.methods.values():
@@ -82,7 +89,9 @@ class SimpleWSPDispatcher:
                     pdesc['type'] = ptype.__name__
                     pdesc['order'] = i
                     mdesc['params'][name] = pdesc
-                mdesc['return_info'] = {'type': method.get_return_info().__name__}
+                mdesc['return_info'] = {
+                    'type': method.get_return_info().__name__
+                }
                 desc['methods'][method.name] = mdesc
         else:
             desc['type'] = 'wsp/fault'
@@ -99,12 +108,13 @@ class SimpleWSPDispatcher:
         if service in self.services:
             resp = {
                 'type': 'wsp/response',
-                'version': str(WSP_VERSION),
+                'version': WSP_VERSION,
                 'url': path
             }
             request = yaml.load(data.decode(self.encoding))
             if request['service'] != service:
-                raise Exception("Requested service '%s' instead of '%s'" % (request['service'], service))
+                raise Exception("Requested service '%s' instead of '%s'"
+                                % (request['service'], service))
             service = self.services[service]
             resp['method'] = request['method']
             method = service.get_method(request['method'])
@@ -115,7 +125,7 @@ class SimpleWSPDispatcher:
                 if name not in req_args:
                     raise Exception("Wrong argument '%s'" % name)
                 args[name] = ptype(req_args[name])  # add try for conversion
-            result = method.function(**args)
+            result = method(**args)
             resp['result'] = result
             if 'mirror' in request:
                 resp['reflection'] = request['mirror']
@@ -135,7 +145,8 @@ class SimpleWSPRequestHandler(BaseHTTPRequestHandler):
         try:
             response = self.server.generate_description(self.path)
         except Exception:
-            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)    # TODO: chacge it to send_error
+            # TODO: chacge it to send_error
+            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header('Content-length', '0')
             self.end_headers()
         else:
